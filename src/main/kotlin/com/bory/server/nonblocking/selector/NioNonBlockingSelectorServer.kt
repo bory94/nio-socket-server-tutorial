@@ -1,9 +1,10 @@
-package com.bory.server.nonblocking
+package com.bory.server.nonblocking.selector
 
 import com.bory.server.log
-import com.bory.server.nonblocking.handler.NonblockingAcceptHandler
-import com.bory.server.nonblocking.handler.NonblockingReadHandler
-import com.bory.server.nonblocking.handler.NonblockingWriteHandler
+import com.bory.server.nonblocking.NIO_NON_BLOCKING_SELECTOR_SERVER_PORT
+import com.bory.server.nonblocking.selector.handler.NonblockingAcceptHandler
+import com.bory.server.nonblocking.selector.handler.NonblockingReadHandler
+import com.bory.server.nonblocking.selector.handler.NonblockingWriteHandler
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
@@ -36,7 +37,6 @@ class NioNonBlockingSelectorServer(private val port: Int) {
                 selector.selectNow()
 
                 val selectionKeys = selector.selectedKeys()
-
                 selectionKeys.forEach { key ->
                     handleSelectionKey(key)
                     selectionKeys.remove(key)
