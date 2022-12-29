@@ -8,8 +8,8 @@ import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.Executors
 
 class AcceptHandler(
-    private val socketChannelsManager: SocketChannelsManager,
-    private val readSelectorManager: ReadSelectorsManager
+    private val clientSocketChannelsManager: ClientSocketChannelsManager,
+    private val readHandlersManager: ReadHandlersManager
 ) {
     val acceptSelector: Selector = Selector.open()
 
@@ -17,11 +17,9 @@ class AcceptHandler(
     private var running: Boolean = true
     private val executor = Executors.newSingleThreadExecutor()
 
-    fun startup() {
-        executor.submit {
-            while (running) {
-                handleAcceptanceInternally()
-            }
+    fun startup() = executor.execute {
+        while (running) {
+            handleAcceptanceInternally()
         }
     }
 
@@ -32,31 +30,9 @@ class AcceptHandler(
             try {
                 when {
                     !key.isValid -> return@forEach
+
                     key.isAcceptable -> {
-                        val serverSocketChannel = key.channel() as ServerSocketChannel
-                        val socketChannel =
-                            serverSocketChannel.accept().apply { configureBlocking(false) }
-
-                        val readHandlerName = getRandomReadHandlerName()
-                        socketChannelsManager.newSocketChannel(
-                            readHandlerName,
-                            socketChannel
-                        )
-
-                        val selector = readSelectorManager.selector(readHandlerName)
-                        log("Accept ==> $selector")
-                        socketChannel.register(
-                            selector,
-                            SelectionKey.OP_READ
-                        )
-
-                        val initialMessage =
-                            "Client accepted::: ${socketChannel.remoteAddress}"
-                        val initialMessageBytes =
-                            "$initialMessage\n> ".toByteArray()
-                        socketChannel.write(ByteBuffer.wrap(initialMessageBytes))
-
-                        log(initialMessage)
+                        accept(key)
                     }
 
                     else -> {}
@@ -67,11 +43,28 @@ class AcceptHandler(
             }
 
             selectionKeys.remove(key)
-
         }
     }
 
-    private fun getRandomReadHandlerName(): String = readSelectorManager.keys().random()
+    private fun accept(key: SelectionKey) {
+        val serverSocketChannel = key.channel() as ServerSocketChannel
+        val socketChannel = serverSocketChannel.accept().apply { configureBlocking(false) }
+        log("Accept ::: $socketChannel")
+
+        val readHandlerName = getRandomReadHandlerName()
+        clientSocketChannelsManager.newSocketChannel(readHandlerName, socketChannel)
+
+        val selector = readHandlersManager.selector(readHandlerName)
+        socketChannel.register(selector, SelectionKey.OP_READ)
+
+        val acceptMessage = "Client accepted::: ${socketChannel.remoteAddress}"
+        val acceptMessageBytes = "$acceptMessage\n> ".toByteArray()
+        socketChannel.write(ByteBuffer.wrap(acceptMessageBytes))
+
+        log(acceptMessage)
+    }
+
+    private fun getRandomReadHandlerName(): String = readHandlersManager.keys().random()
 
     fun shutdown() {
         executor.shutdown()

@@ -4,24 +4,22 @@ import com.bory.server.log
 import com.bory.server.nonblocking.readAndCreateSendMessage
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
 import java.nio.channels.SocketChannel
 import java.util.concurrent.Executors
 
 class ReadHandler(
-    private val readerKey: String,
-    private val socketChannelsManager: SocketChannelsManager,
-    readSelectorManager: ReadSelectorsManager
+    val readerKey: String,
+    private val clientSocketChannelsManager: ClientSocketChannelsManager,
+    private val readSelector: Selector
 ) {
     @Volatile
     private var running: Boolean = true
     private val executor = Executors.newSingleThreadExecutor()
-    private val readSelector = readSelectorManager.selector(readerKey)
 
-    fun startup() {
-        executor.submit {
-            while (running) {
-                handleRequestInternally()
-            }
+    fun startup() = executor.execute {
+        while (running) {
+            handleRequestInternally()
         }
     }
 
@@ -35,51 +33,49 @@ class ReadHandler(
             try {
                 when {
                     !key.isValid -> {
-                        socketChannelsManager.closeSocketChannel(
-                            readerKey,
-                            socketChannel
-                        )
-                        return@forEach
+                        clientSocketChannelsManager.closeSocketChannel(readerKey, socketChannel)
                     }
 
                     key.isReadable -> {
-                        val buffer =
-                            socketChannelsManager.getByteBuffer(readerKey, socketChannel)
-                        when (socketChannel.read(buffer)) {
-                            -1 -> {
-                                log("socketChannel closed ::: $socketChannel")
-                                socketChannelsManager.closeSocketChannel(readerKey, socketChannel)
-                            }
-
-                            else -> {
-                                val (message, sendMessageByteArray) = readAndCreateSendMessage(
-                                    buffer
-                                )
-
-                                socketChannel.write(ByteBuffer.wrap(sendMessageByteArray))
-                                key.interestOps(SelectionKey.OP_READ)
-
-                                if (message == "exit") {
-                                    log("Closing Client::: $socketChannel")
-                                    socketChannelsManager.closeSocketChannel(
-                                        readerKey,
-                                        socketChannel
-                                    )
-                                }
-                            }
-                        }
+                        handleReadRequest(socketChannel, key)
                     }
 
                     else -> {}
                 }
             } catch (e: Exception) {
                 log("Socket Error Occurred")
-                socketChannelsManager.closeSocketChannel(readerKey, socketChannel)
+                clientSocketChannelsManager.closeSocketChannel(readerKey, socketChannel)
 
                 e.printStackTrace()
             }
         }
-        socketChannelsManager.removeClosedSocketChannel(readerKey)
+        clientSocketChannelsManager.removeAllClosedSocketChannel(readerKey)
+    }
+
+    private fun handleReadRequest(
+        socketChannel: SocketChannel,
+        key: SelectionKey
+    ) {
+        val buffer =
+            clientSocketChannelsManager.byteBuffer(readerKey, socketChannel)
+        when (socketChannel.read(buffer)) {
+            -1 -> {
+                log("socketChannel closed ::: $socketChannel")
+                clientSocketChannelsManager.closeSocketChannel(readerKey, socketChannel)
+            }
+
+            else -> {
+                val (message, sendMessageByteArray) = readAndCreateSendMessage(buffer)
+
+                socketChannel.write(ByteBuffer.wrap(sendMessageByteArray))
+                key.interestOps(SelectionKey.OP_READ)
+
+                if (message == "exit") {
+                    log("Closing Client::: $socketChannel")
+                    clientSocketChannelsManager.closeSocketChannel(readerKey, socketChannel)
+                }
+            }
+        }
     }
 
     fun shutdown() {

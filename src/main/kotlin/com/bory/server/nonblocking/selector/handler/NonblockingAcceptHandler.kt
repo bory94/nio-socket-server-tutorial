@@ -17,7 +17,7 @@ class NonblockingAcceptHandler(
         val socketChannel = serverSocketChannel.accept().apply { configureBlocking(false) }
         socketChannel.register(key.selector(), SelectionKey.OP_READ)
 
-        executor.submit { handleInternal(socketChannel) }
+        executor.execute { handleInternal(socketChannel) }
     }
 
     private fun handleInternal(socketChannel: SocketChannel) {

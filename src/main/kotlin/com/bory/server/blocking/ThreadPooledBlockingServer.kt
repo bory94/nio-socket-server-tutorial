@@ -12,7 +12,7 @@ class ThreadPooledBlockingServer(private val port: Int) {
         log("Startup Server on Port[$port]...")
         while (true) {
             processBlockingIoRequest(serverSocket) { socket ->
-                executor.submit {
+                executor.execute {
                     ClientSocketProcessor(socket).process()
                 }
             }
