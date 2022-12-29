@@ -1,6 +1,7 @@
 package com.bory.server.nonblocking.selector.handler
 
 import com.bory.server.log
+import com.bory.server.nonblocking.readAndCreateSendMessage
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
@@ -33,16 +34,7 @@ class NonblockingReadHandler(
         socketChannel: SocketChannel,
         buffer: ByteBuffer,
     ) {
-        buffer.flip()
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        val message = String(bytes).trim()
-
-        val receivedMessage = "Received Message ::: $message"
-        log("\t$receivedMessage")
-
-        buffer.compact()
-        val sendMessageByteArray = "==> $receivedMessage\n> ".toByteArray()
+        val (message, sendMessageByteArray) = readAndCreateSendMessage(buffer)
         buffer.put(sendMessageByteArray, 0, sendMessageByteArray.size)
 
         key.interestOps(SelectionKey.OP_WRITE)

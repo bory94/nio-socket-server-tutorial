@@ -31,3 +31,16 @@ fun processRequest(socketChannel: SocketChannel, buffer: ByteBuffer): String {
 
     return message
 }
+
+fun readAndCreateSendMessage(buffer: ByteBuffer): Pair<String, ByteArray> {
+    buffer.flip()
+    val bytes = ByteArray(buffer.remaining())
+    buffer.get(bytes)
+    val message = String(bytes).trim()
+
+    val receivedMessage = "Received Message ::: $message"
+    log("\t$receivedMessage")
+
+    buffer.compact()
+    return Pair(message, "==> $receivedMessage\n> ".toByteArray())
+}
