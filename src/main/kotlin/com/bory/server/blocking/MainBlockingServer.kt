@@ -3,11 +3,11 @@ package com.bory.server.blocking
 import com.bory.server.log
 import java.net.ServerSocket
 
-class MainBlockingServer(port: Int) {
+class MainBlockingServer(private val port: Int) {
     private val serverSocket: ServerSocket = ServerSocket(port)
 
     fun startup() {
-        log("Server Starting...")
+        log("Startup Server on Port[$port]...")
         while (true) {
             processBlockingIoRequest(serverSocket) { socket -> ClientSocketProcessor(socket).process() }
         }

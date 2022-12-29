@@ -1,6 +1,9 @@
 package com.bory.server.nonblocking
 
 import com.bory.server.log
+import com.bory.server.nonblocking.handler.NonblockingAcceptHandler
+import com.bory.server.nonblocking.handler.NonblockingReadHandler
+import com.bory.server.nonblocking.handler.NonblockingWriteHandler
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
@@ -8,11 +11,17 @@ import java.nio.channels.Selector
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
-class NioNonBlockingSelectorServer(port: Int) {
+class NioNonBlockingSelectorServer(private val port: Int) {
     private val serverSocketChannel = ServerSocketChannel.open()
     private val selector = Selector.open()
     private val socketChannels = ConcurrentHashMap<SocketChannel, ByteBuffer>()
+    private val acceptExecutor = Executors.newFixedThreadPool(20)
+
+    private val acceptHandler = NonblockingAcceptHandler(socketChannels, acceptExecutor)
+    private val readHandler = NonblockingReadHandler(socketChannels)
+    private val writeHandler = NonblockingWriteHandler(socketChannels)
 
     init {
         serverSocketChannel.bind(InetSocketAddress(port))
@@ -21,100 +30,43 @@ class NioNonBlockingSelectorServer(port: Int) {
     }
 
     fun startup() {
-        log("Startup Server...")
-        while (true) {
-            selector.select()
+        log("Startup Server on Port[$port]...")
+        try {
+            while (true) {
+                selector.selectNow()
 
-            val selectionKeys = selector.selectedKeys()
-            selectionKeys.iterator().forEach { key ->
-                selectionKeys.remove(key)
-                handleSelectionKey(key)
+                val selectionKeys = selector.selectedKeys()
+
+                selectionKeys.forEach { key ->
+                    handleSelectionKey(key)
+                    selectionKeys.remove(key)
+                }
+
+                socketChannels.keys.removeIf { !it.isOpen }
             }
-
-            socketChannels.keys.removeIf { !it.isOpen }
+        } finally {
+            acceptExecutor.shutdown()
+            log("Server on Port[$port] shut down")
         }
     }
 
     private fun handleSelectionKey(key: SelectionKey) {
         try {
-            if (!key.isValid) {
-                return
-            }
-
             when {
-                key.isAcceptable -> accept(key)
-                key.isReadable -> read(key)
-                key.isWritable -> write(key)
+                !key.isValid -> return
+                key.isAcceptable -> acceptHandler.handle(key)
+                key.isReadable -> readHandler.handle(key)
+                key.isWritable -> writeHandler.handle(key)
+                else -> {}
             }
 
         } catch (e: Exception) {
+            log("Socket Error Occurred")
+            val socketChannel = key.channel() as SocketChannel
+            closeSocketChannel(socketChannel)
+
             e.printStackTrace()
         }
-    }
-
-    private fun accept(key: SelectionKey) {
-        val serverSocketChannel = key.channel() as ServerSocketChannel
-        val socketChannel = serverSocketChannel.accept().apply { configureBlocking(false) }
-        socketChannel.register(key.selector(), SelectionKey.OP_READ)
-
-        val buffer = ByteBuffer.allocateDirect(1024)
-        socketChannels[socketChannel] = buffer
-
-        val initialMessage = "Client accepted::: ${socketChannel.remoteAddress}"
-        val initialMessageBytes =
-            "$initialMessage\n> ".toByteArray()
-        socketChannel.write(ByteBuffer.wrap(initialMessageBytes))
-
-        log(initialMessage)
-    }
-
-    private fun read(key: SelectionKey) {
-        val socketChannel = key.channel() as SocketChannel
-        val buffer = socketChannels[socketChannel]
-            ?: throw IllegalStateException("Buffer not found for $socketChannel")
-
-        buffer.info("READ")
-        when (val read = socketChannel.read(buffer)) {
-            -1 -> {
-                log("Closing socketChannel ::: $socketChannel ::: read = $read")
-                closeSocketChannel(socketChannel)
-            }
-
-            else -> {
-                buffer.flip()
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                val message = String(bytes).trim()
-
-                val receivedMessage = "Received Message ::: $message"
-                log("\t$receivedMessage")
-
-                buffer.compact()
-                val sendMessageByteArray = "==> $receivedMessage\n> ".toByteArray()
-                buffer.put(sendMessageByteArray, 0, sendMessageByteArray.size)
-
-                key.interestOps(SelectionKey.OP_WRITE)
-
-                if (message == "exit") {
-                    closeSocketChannel(socketChannel)
-                }
-            }
-        }
-
-    }
-
-    private fun write(key: SelectionKey) {
-        val socketChannel = key.channel() as SocketChannel
-        val buffer = socketChannels[socketChannel]
-            ?: throw IllegalStateException("Buffer not found for $socketChannel")
-
-        buffer.flip()
-        buffer.info("WRITE")
-        while (buffer.hasRemaining()) {
-            socketChannel.write(buffer)
-        }
-        key.interestOps(SelectionKey.OP_READ)
-        buffer.compact()
     }
 
     private fun closeSocketChannel(socketChannel: SocketChannel) = try {

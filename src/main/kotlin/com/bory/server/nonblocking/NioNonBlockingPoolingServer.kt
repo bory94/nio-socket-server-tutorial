@@ -8,7 +8,7 @@ import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
 
 // Bad Practice. Don't do this.
-class NioNonBlockingPoolingServer(port: Int) {
+class NioNonBlockingPoolingServer(private val port: Int) {
     private val serverSocketChannel = ServerSocketChannel.open()
     private val socketChannels = ConcurrentHashMap<SocketChannel, ByteBuffer>()
 
@@ -19,7 +19,7 @@ class NioNonBlockingPoolingServer(port: Int) {
     }
 
     fun startup() {
-        log("Startup Server...")
+        log("Startup Server on Port[$port]...")
         while (true) {
             val socketChannel = serverSocketChannel.accept()
             if (socketChannel != null && !socketChannels.containsKey(socketChannel)) {

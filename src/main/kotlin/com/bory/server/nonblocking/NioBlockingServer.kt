@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 
-class NioBlockingServer(port: Int) {
+class NioBlockingServer(private val port: Int) {
     private val serverSocketChannel = ServerSocketChannel.open()
 
     init {
@@ -14,7 +14,7 @@ class NioBlockingServer(port: Int) {
     }
 
     fun startup() {
-        log("Startup Server...")
+        log("Startup Server on Port[$port]...")
         while (true) {
             val socketChannel = serverSocketChannel.accept()
             handleClient(socketChannel)

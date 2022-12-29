@@ -4,7 +4,7 @@ import com.bory.server.log
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 
-class ThreadedBlockingServer(port: Int) {
+class ThreadedBlockingServer(private val port: Int) {
     private val serverSocket: ServerSocket
 
     init {
@@ -12,7 +12,7 @@ class ThreadedBlockingServer(port: Int) {
     }
 
     fun startup() {
-        log("Server Starting...")
+        log("Startup Server on Port[$port]...")
         while (true) {
             processBlockingIoRequest(serverSocket) { socket ->
                 thread { ClientSocketProcessor(socket).process() }

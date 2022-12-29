@@ -4,12 +4,12 @@ import com.bory.server.log
 import java.net.ServerSocket
 import java.util.concurrent.Executors
 
-class ThreadPooledBlockingServer(port: Int) {
+class ThreadPooledBlockingServer(private val port: Int) {
     private val serverSocket = ServerSocket(port)
     private val executor = Executors.newFixedThreadPool(3)
 
     fun startup() {
-        log("Server Starting...")
+        log("Startup Server on Port[$port]...")
         while (true) {
             processBlockingIoRequest(serverSocket) { socket ->
                 executor.submit {
