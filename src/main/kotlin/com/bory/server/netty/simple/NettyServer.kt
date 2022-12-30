@@ -61,7 +61,7 @@ class NettyEchoHandler : ChannelInboundHandlerAdapter() {
         val writeBuf = Unpooled.buffer(returnMessage.length + 4)
         writeBuf.writeUtf8("$returnMessage\n> ")
 
-        ctx.write(writeBuf)
+        ctx.writeAndFlush(writeBuf)
 
         if (readMessage == "exit") {
             ctx.close()

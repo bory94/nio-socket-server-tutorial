@@ -37,12 +37,11 @@ class NettyClient(private val host: String, private val port: Int) {
 
 class EchoClientHandler : SimpleChannelInboundHandler<ByteBuf>() {
     override fun channelActive(ctx: ChannelHandlerContext) {
-        ctx.writeAndFlush(Unpooled.copiedBuffer("잘 될까요?", Charsets.UTF_8))
+        ctx.writeAndFlush(Unpooled.copiedBuffer("exit", Charsets.UTF_8))
     }
 
     override fun channelRead0(ctx: ChannelHandlerContext, msg: ByteBuf) {
         log("<== Client Received Message: ${msg.toString(Charsets.UTF_8)}")
-        ctx.close()
     }
 }
 
