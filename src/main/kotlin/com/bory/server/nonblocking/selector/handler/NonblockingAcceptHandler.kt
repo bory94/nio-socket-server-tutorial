@@ -6,12 +6,13 @@ import java.nio.channels.SelectionKey
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class NonblockingAcceptHandler(
-    private val socketChannels: ConcurrentHashMap<SocketChannel, ByteBuffer>,
-    private val executor: ExecutorService
+    private val socketChannels: ConcurrentHashMap<SocketChannel, ByteBuffer>
 ) : NonblockingHandler {
+
+    private val executor = Executors.newFixedThreadPool(20)
     override fun handle(key: SelectionKey) {
         val serverSocketChannel = key.channel() as ServerSocketChannel
         val socketChannel = serverSocketChannel.accept().apply { configureBlocking(false) }
@@ -30,6 +31,10 @@ class NonblockingAcceptHandler(
         socketChannel.write(ByteBuffer.wrap(initialMessageBytes))
 
         log(initialMessage)
+    }
+
+    fun shutdown() {
+        executor.shutdown()
     }
 
 }

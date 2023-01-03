@@ -12,15 +12,13 @@ import java.nio.channels.Selector
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 
 class NioNonBlockingSelectorServer(private val port: Int) {
     private val serverSocketChannel = ServerSocketChannel.open()
     private val selector = Selector.open()
     private val socketChannels = ConcurrentHashMap<SocketChannel, ByteBuffer>()
-    private val acceptExecutor = Executors.newFixedThreadPool(20)
 
-    private val acceptHandler = NonblockingAcceptHandler(socketChannels, acceptExecutor)
+    private val acceptHandler = NonblockingAcceptHandler(socketChannels)
     private val readHandler = NonblockingReadHandler(socketChannels)
     private val writeHandler = NonblockingWriteHandler(socketChannels)
 
@@ -45,7 +43,7 @@ class NioNonBlockingSelectorServer(private val port: Int) {
                 socketChannels.keys.removeIf { !it.isOpen }
             }
         } finally {
-            acceptExecutor.shutdown()
+            acceptHandler.shutdown()
             log("Server on Port[$port] shut down")
         }
     }
